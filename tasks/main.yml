@@ -1,0 +1,102 @@
+---
+- name: 'kafka | Create group'
+  group:
+    name: "{{ kafka_group }}"
+    system: true
+
+- name: 'kafka | Create user'
+  user:
+    name: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ kafka_home }}"
+    create_home: false
+
+- name: 'kafka | Ensure data and log directories'
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: '0755'
+  loop:
+    - "{{ kafka_data_dir }}"
+    - "{{ kafka_log_dir }}"
+
+- name: 'kafka | Check whether {{ kafka_version }} is already unpacked'
+  stat:
+    path: "{{ kafka_install_dir }}/kafka_{{ kafka_scala_version }}-{{ kafka_version }}"
+  register: kafka_dist
+
+- name: 'kafka | Download Apache Kafka {{ kafka_version }}'
+  get_url:
+    url: "{{ kafka_download_base }}/{{ kafka_version }}/kafka_{{ kafka_scala_version }}-{{ kafka_version }}.tgz"
+    dest: "/tmp/kafka_{{ kafka_scala_version }}-{{ kafka_version }}.tgz"
+    mode: '0644'
+    timeout: 120
+  register: kafka_dl
+  until: kafka_dl is success
+  retries: 3
+  delay: 10
+  when: not kafka_dist.stat.exists
+
+- name: 'kafka | Unpack distribution'
+  unarchive:
+    src: "/tmp/kafka_{{ kafka_scala_version }}-{{ kafka_version }}.tgz"
+    dest: "{{ kafka_install_dir }}"
+    remote_src: true
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+  when: not kafka_dist.stat.exists
+
+- name: 'kafka | Symlink {{ kafka_home }} -> current version'
+  file:
+    src: "{{ kafka_install_dir }}/kafka_{{ kafka_scala_version }}-{{ kafka_version }}"
+    dest: "{{ kafka_home }}"
+    state: link
+  notify: restart kafka
+
+- name: 'kafka | Deploy server.properties'
+  template:
+    src: server.properties.j2
+    dest: "{{ kafka_home }}/config/server.properties"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: '0644'
+  notify: restart kafka
+
+- name: 'kafka | Format KRaft storage (once)'
+  command: >
+    {{ kafka_home }}/bin/kafka-storage.sh format
+    -t {{ kafka_cluster_id }}
+    -c {{ kafka_home }}/config/server.properties
+  args:
+    creates: "{{ kafka_data_dir }}/meta.properties"
+
+- name: 'kafka | Ensure data/log ownership'
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    recurse: true
+  loop:
+    - "{{ kafka_data_dir }}"
+    - "{{ kafka_log_dir }}"
+
+- name: 'kafka | Deploy systemd unit'
+  template:
+    src: kafka.service.j2
+    dest: /etc/systemd/system/kafka.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart kafka
+
+- name: 'kafka | Enable and start'
+  systemd:
+    name: kafka
+    enabled: true
+    state: started
+    daemon_reload: true

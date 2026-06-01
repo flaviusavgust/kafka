@@ -1,0 +1,37 @@
+# {{ ansible_managed }}
+# Apache Kafka {{ kafka_version }} — KRaft combined node ({{ inventory_hostname }})
+
+process.roles=broker,controller
+node.id={{ kafka_node_id }}
+controller.quorum.voters={% for h in groups['kafka'] %}{{ hostvars[h].kafka_node_id }}@{{ hostvars[h].ansible_host }}:{{ kafka_controller_port }}{% if not loop.last %},{% endif %}{% endfor %}
+
+
+############################# Listeners (PLAINTEXT, no TLS/SASL) #############################
+listeners=PLAINTEXT://0.0.0.0:{{ kafka_client_port }},CONTROLLER://0.0.0.0:{{ kafka_controller_port }}
+advertised.listeners=PLAINTEXT://{{ ansible_host }}:{{ kafka_client_port }}
+listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+inter.broker.listener.name=PLAINTEXT
+controller.listener.names=CONTROLLER
+
+############################# Storage #############################
+log.dirs={{ kafka_data_dir }}
+
+############################# Durability #############################
+num.partitions={{ kafka_num_partitions }}
+default.replication.factor={{ kafka_default_replication_factor }}
+min.insync.replicas={{ kafka_min_insync_replicas }}
+offsets.topic.replication.factor={{ kafka_default_replication_factor }}
+transaction.state.log.replication.factor={{ kafka_default_replication_factor }}
+transaction.state.log.min.isr={{ kafka_min_insync_replicas }}
+unclean.leader.election.enable=false
+auto.create.topics.enable=false
+
+############################# Retention #############################
+log.retention.hours={{ kafka_log_retention_hours }}
+log.retention.bytes={{ kafka_log_retention_bytes }}
+log.retention.check.interval.ms=300000
+
+############################# Threads #############################
+num.network.threads=3
+num.io.threads=4
+group.initial.rebalance.delay.ms=0

@@ -1,0 +1,22 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Apache Kafka (KRaft, combined broker+controller)
+Documentation=https://kafka.apache.org/documentation/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ kafka_user }}
+Group={{ kafka_group }}
+Environment="KAFKA_HEAP_OPTS={{ kafka_heap_opts }}"
+Environment="LOG_DIR={{ kafka_log_dir }}"
+ExecStart={{ kafka_home }}/bin/kafka-server-start.sh {{ kafka_home }}/config/server.properties
+ExecStop={{ kafka_home }}/bin/kafka-server-stop.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+LimitNOFILE=100000
+
+[Install]
+WantedBy=multi-user.target
