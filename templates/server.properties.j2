@@ -14,13 +14,20 @@ inter.broker.listener.name=SASL_PLAINTEXT
 controller.listener.names=CONTROLLER
 
 ############################# Authentication #############################
-# SASL/SCRAM only. No authorizer is configured, so ACLs are not evaluated:
-# any client that authenticates successfully has full access.
+# No authorizer is configured, so ACLs are not evaluated: any client that
+# authenticates successfully has full access.
+#
+# Client/inter-broker listener: SASL/SCRAM-SHA-512 (users live in cluster metadata).
+# Controller listener: SASL/PLAIN with static JAAS creds (admin only). SCRAM
+# cannot be used here: controllers do not apply SCRAM records from the
+# bootstrap checkpoint until a quorum leader is elected, so a multi-node
+# quorum with SCRAM on the controller listener deadlocks on mutual auth.
 sasl.enabled.mechanisms=SCRAM-SHA-512
 sasl.mechanism.inter.broker.protocol=SCRAM-SHA-512
-sasl.mechanism.controller.protocol=SCRAM-SHA-512
+sasl.mechanism.controller.protocol=PLAIN
 listener.name.sasl_plaintext.scram-sha-512.sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{{ kafka_admin_user }}" password="{{ kafka_admin_password }}";
-listener.name.controller.scram-sha-512.sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{{ kafka_admin_user }}" password="{{ kafka_admin_password }}";
+listener.name.controller.sasl.enabled.mechanisms=PLAIN
+listener.name.controller.plain.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="{{ kafka_admin_user }}" password="{{ kafka_admin_password }}" user_{{ kafka_admin_user }}="{{ kafka_admin_password }}";
 
 ############################# Storage #############################
 log.dirs={{ kafka_data_dir }}

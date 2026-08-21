@@ -34,7 +34,12 @@ kafka_client_users:
 ```
 
 The admin credential is bootstrapped at `kafka-storage.sh format --add-scram`
-time (KIP-900), so it works for the controller quorum before the cluster is up.
+time (KIP-900) for the client/inter-broker listener. The **controller listener
+uses SASL/PLAIN** with the same admin credential, statically in JAAS: SCRAM
+cannot protect the controller quorum — controllers do not apply SCRAM records
+from the bootstrap checkpoint until a leader is elected, so a multi-node quorum
+with SCRAM on the controller listener deadlocks on mutual authentication
+(verified empirically; identical bootstrap checkpoints on all nodes do not help).
 Client users are created against the running cluster with `kafka-configs.sh`
 (run_once, create-only): **adding** a user = add to the list and re-run the
 playbook, no restart needed. **Password changes and deletions are not managed**
