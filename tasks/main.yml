@@ -63,16 +63,26 @@
     dest: "{{ kafka_home }}/config/server.properties"
     owner: "{{ kafka_user }}"
     group: "{{ kafka_group }}"
-    mode: '0644'
+    mode: '0600'                             # contains the admin SASL password
   notify: restart kafka
 
-- name: 'kafka | Format KRaft storage (once)'
+- name: 'kafka | Deploy admin client config'
+  template:
+    src: admin-client.properties.j2
+    dest: "{{ kafka_home }}/config/admin-client.properties"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: '0600'
+
+- name: 'kafka | Format KRaft storage (once, bootstraps admin SCRAM creds)'
   command: >
     {{ kafka_home }}/bin/kafka-storage.sh format
     -t {{ kafka_cluster_id }}
     -c {{ kafka_home }}/config/server.properties
+    --add-scram {{ ('SCRAM-SHA-512=[name=' ~ kafka_admin_user ~ ',password=' ~ kafka_admin_password ~ ']') | quote }}
   args:
     creates: "{{ kafka_data_dir }}/meta.properties"
+  no_log: "{{ kafka_no_log }}"
 
 - name: 'kafka | Ensure data/log ownership'
   file:
@@ -100,3 +110,39 @@
     enabled: true
     state: started
     daemon_reload: true
+
+- name: 'kafka | Wait for client listener'
+  wait_for:
+    host: 127.0.0.1
+    port: "{{ kafka_client_port }}"
+    timeout: 120
+
+# --- SCRAM client users. No authorizer is configured, so every user created
+# here has full access. Create-only: existing users are not touched (password
+# change in vars has no effect) and users removed from the list are not deleted.
+- name: 'kafka | List existing SCRAM users'
+  command: >
+    {{ kafka_home }}/bin/kafka-configs.sh
+    --bootstrap-server 127.0.0.1:{{ kafka_client_port }}
+    --command-config {{ kafka_home }}/config/admin-client.properties
+    --describe --entity-type users
+  register: kafka_scram_users
+  changed_when: false
+  until: kafka_scram_users is success
+  retries: 5
+  delay: 10
+  run_once: true
+
+- name: 'kafka | Create SCRAM credentials for client users'
+  command: >
+    {{ kafka_home }}/bin/kafka-configs.sh
+    --bootstrap-server 127.0.0.1:{{ kafka_client_port }}
+    --command-config {{ kafka_home }}/config/admin-client.properties
+    --alter --entity-type users --entity-name {{ item.username | quote }}
+    --add-config {{ ('SCRAM-SHA-512=[password=' ~ item.password ~ ']') | quote }}
+  loop: "{{ kafka_client_users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  when: ("'" ~ item.username ~ "'") not in kafka_scram_users.stdout
+  run_once: true
+  no_log: "{{ kafka_no_log }}"

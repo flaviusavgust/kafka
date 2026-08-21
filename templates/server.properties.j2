@@ -6,12 +6,21 @@ node.id={{ kafka_node_id }}
 controller.quorum.voters={% for h in groups['kafka'] %}{{ hostvars[h].kafka_node_id }}@{{ hostvars[h].ansible_host }}:{{ kafka_controller_port }}{% if not loop.last %},{% endif %}{% endfor %}
 
 
-############################# Listeners (PLAINTEXT, no TLS/SASL) #############################
-listeners=PLAINTEXT://0.0.0.0:{{ kafka_client_port }},CONTROLLER://0.0.0.0:{{ kafka_controller_port }}
-advertised.listeners=PLAINTEXT://{{ ansible_host }}:{{ kafka_client_port }}
-listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-inter.broker.listener.name=PLAINTEXT
+############################# Listeners (SASL_PLAINTEXT, SCRAM-SHA-512, no TLS) #############################
+listeners=SASL_PLAINTEXT://0.0.0.0:{{ kafka_client_port }},CONTROLLER://0.0.0.0:{{ kafka_controller_port }}
+advertised.listeners=SASL_PLAINTEXT://{{ ansible_host }}:{{ kafka_client_port }}
+listener.security.protocol.map=SASL_PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:SASL_PLAINTEXT
+inter.broker.listener.name=SASL_PLAINTEXT
 controller.listener.names=CONTROLLER
+
+############################# Authentication #############################
+# SASL/SCRAM only. No authorizer is configured, so ACLs are not evaluated:
+# any client that authenticates successfully has full access.
+sasl.enabled.mechanisms=SCRAM-SHA-512
+sasl.mechanism.inter.broker.protocol=SCRAM-SHA-512
+sasl.mechanism.controller.protocol=SCRAM-SHA-512
+listener.name.sasl_plaintext.scram-sha-512.sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{{ kafka_admin_user }}" password="{{ kafka_admin_password }}";
+listener.name.controller.scram-sha-512.sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{{ kafka_admin_user }}" password="{{ kafka_admin_password }}";
 
 ############################# Storage #############################
 log.dirs={{ kafka_data_dir }}

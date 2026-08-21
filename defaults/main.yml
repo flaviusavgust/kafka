@@ -11,5 +11,17 @@ kafka_home: /opt/kafka
 kafka_data_dir: /var/lib/kafka/data        # on the dedicated LVM mount /var/lib/kafka
 kafka_log_dir: /var/log/kafka
 
-kafka_client_port: 9092                      # PLAINTEXT clients
+kafka_client_port: 9092                      # SASL_PLAINTEXT clients
 kafka_controller_port: 9093                  # KRaft controller quorum
+
+# --- Authentication (SASL/SCRAM-SHA-512, no authorizer => any authenticated
+# user has full access). kafka_admin_password and kafka_client_users are
+# expected from group_vars (vault): the admin serves inter-broker/controller
+# traffic and admin CLI ops; client users are created in the cluster idempotently.
+kafka_admin_user: admin
+# kafka_admin_password: <from vault>
+kafka_client_users: []                       # list of {username, password}
+
+# Set to false temporarily to debug failing user-management/format tasks
+# (their commands contain passwords, so output is hidden by default).
+kafka_no_log: true

@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# Admin client credentials — used by the role (kafka-configs) and for manual
+# operator commands: --command-config {{ kafka_home }}/config/admin-client.properties
+security.protocol=SASL_PLAINTEXT
+sasl.mechanism=SCRAM-SHA-512
+sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{{ kafka_admin_user }}" password="{{ kafka_admin_password }}";

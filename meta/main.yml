@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   role_name: kafka
-  description: Apache Kafka 4.x (KRaft combined broker+controller), PLAINTEXT
+  description: Apache Kafka 4.x (KRaft combined broker+controller), SASL/SCRAM auth without ACLs
   license: MIT
   min_ansible_version: "2.16"
   platforms:
