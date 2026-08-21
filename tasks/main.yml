@@ -111,6 +111,11 @@
     state: started
     daemon_reload: true
 
+# Apply any pending config/unit restart now: the checks below must observe the
+# broker running the just-deployed config, not the previous one.
+- name: 'kafka | Flush handlers'
+  meta: flush_handlers
+
 - name: 'kafka | Wait for client listener'
   wait_for:
     host: 127.0.0.1
